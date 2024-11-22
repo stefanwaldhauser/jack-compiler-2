@@ -2,10 +2,10 @@ from Shared import TOKEN_TYPE
 
 
 class CompilationEngine:
-    def __init__(self, tokenizer, file, symbol_table):
+    def __init__(self, tokenizer, vm_writer, symbol_table):
         self.tokenizer = tokenizer
         self.symbol_table = symbol_table
-        self.file = file
+        self.vm_writer = vm_writer
         self.level = 0
         self.class_name = ""
 
@@ -110,7 +110,7 @@ class CompilationEngine:
         # ('constructor' | 'function' | 'method')
         subroutine_type = self.compile_keyword()
         self.symbol_table.start_subroutine()
-        
+
         if subroutine_type == "method":
             self.symbol_table.define("this", self.class_name, "arg")
 
