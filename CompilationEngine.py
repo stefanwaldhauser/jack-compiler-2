@@ -379,6 +379,11 @@ class CompilationEngine:
                 self.vm_writer.write_arithmetic("neg")
             if value == "false":
                 self.vm_writer.write_push("constant", 0)
+            if value == "null":
+                self.vm_writer.write_push("constant", 0)
+            if value == "this":
+                self.vm_writer.write_push(self.symbol_table.virtual_segment_of(
+                    "this"), self.symbol_table.index_of("this"))
 
         elif self.tokenizer.token_type() == TOKEN_TYPE.SYMBOL and self.tokenizer.symbol() in ["~", "-"]:
             value = self.compile_symbol()
@@ -406,13 +411,13 @@ class CompilationEngine:
                     f"{classOrVarName}.{subroutine_name}", nArgs)
 
             # Array access, like array[index]
-            if self.tokenizer.token_type() == TOKEN_TYPE.SYMBOL and self.tokenizer.symbol() == "[":
+            elif self.tokenizer.token_type() == TOKEN_TYPE.SYMBOL and self.tokenizer.symbol() == "[":
                 self.compile_symbol()
                 self.compile_expression()
                 self.compile_symbol()
 
             # Function call: we handle this case by compiling the function name and arguments
-            if self.tokenizer.token_type() == TOKEN_TYPE.SYMBOL and self.tokenizer.symbol() == "(":
+            elif self.tokenizer.token_type() == TOKEN_TYPE.SYMBOL and self.tokenizer.symbol() == "(":
                 self.compile_symbol()
                 subroutine_name = identifier
                 nArgs = self.compile_expression_list()
@@ -420,6 +425,10 @@ class CompilationEngine:
                     f"{self.class_name}.{subroutine_name}", nArgs)
 
                 self.compile_symbol()
+            # varName
+            else:
+                self.vm_writer.write_push(self.symbol_table.virtual_segment_of(
+                    identifier), self.symbol_table.index_of(identifier))
 
     def compile_expression_list(self):
         nArgs = 0
