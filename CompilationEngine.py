@@ -204,29 +204,49 @@ class CompilationEngine:
                 self.compile_return_statement()
 
     # maps to grammar rule 'let' varName ('[' expression ']')? '=' expression';'
+
     def compile_let_statement(self):
         # 'let'
         self.compile_keyword()
         # varName
         varName = self.compile_identifier()
 
-        # ('[' expression ']')?
+        # Handle array assignment: let arr[expr1] = expr2
+        is_array = False
         if self.tokenizer.token_type() == TOKEN_TYPE.SYMBOL and self.tokenizer.symbol() == '[':
+            is_array = True
+            # Push array base address
+            self.vm_writer.write_push(
+                self.symbol_table.virtual_segment_of(varName),
+                self.symbol_table.index_of(varName)
+            )
+
             # '['
             self.compile_symbol()
-            # expression
+            # expression (index)
             self.compile_expression()
             # ']'
             self.compile_symbol()
 
-        # ' ='
+            self.vm_writer.write_arithmetic("add")
+
+        # '='
         self.compile_symbol()
 
-        # expression
+        # expression (value to assign)
         self.compile_expression()
 
-        self.vm_writer.write_pop(self.symbol_table.virtual_segment_of(
-            varName), self.symbol_table.index_of(varName))
+        if is_array:
+            self.vm_writer.write_pop("temp", 0)
+            self.vm_writer.write_pop("pointer", 1)
+            self.vm_writer.write_push("temp", 0)
+            self.vm_writer.write_pop("that", 0)
+        else:
+
+            self.vm_writer.write_pop(
+                self.symbol_table.virtual_segment_of(varName),
+                self.symbol_table.index_of(varName)
+            )
 
         # ';'
         self.compile_symbol()
@@ -375,10 +395,8 @@ class CompilationEngine:
             self.vm_writer.write_push("constant", length)
             self.vm_writer.write_call("String.new", 1)
             for char in value:
-                self.vm_writer.write_push('temp', 0)
                 self.vm_writer.write_push('constant', ord(char))
                 self.vm_writer.write_call('String.appendChar', 2)
-                self.vm_writer.write_pop('temp', 0)
 
         elif self.tokenizer.token_type() == TOKEN_TYPE.KEYWORD and self.tokenizer.key_word() in ["true", "false", "null", "this"]:
             value = self.compile_keyword()
@@ -428,9 +446,20 @@ class CompilationEngine:
 
             # Array access, like array[index]
             elif self.tokenizer.token_type() == TOKEN_TYPE.SYMBOL and self.tokenizer.symbol() == "[":
+                self.vm_writer.write_push(
+                    self.symbol_table.virtual_segment_of(identifier),
+                    self.symbol_table.index_of(identifier)
+                )
+
                 self.compile_symbol()
                 self.compile_expression()
                 self.compile_symbol()
+
+                self.vm_writer.write_arithmetic("add")
+
+                # Set THAT to point to arr[index]
+                self.vm_writer.write_pop("pointer", 1)
+                self.vm_writer.write_push("that", 0)     # Push arr[index]
 
             # Calls methods of the current object
             elif self.tokenizer.token_type() == TOKEN_TYPE.SYMBOL and self.tokenizer.symbol() == "(":
