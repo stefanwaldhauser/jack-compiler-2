@@ -171,12 +171,6 @@ class JackTokenizer:
         Returns:
             str: The character that is the current token
         """
-        if self.current_token.value == "<":
-            return "&lt;"
-        if self.current_token.value == ">":
-            return "&gt;"
-        if self.current_token.value == "&":
-            return "&amp;"
         return self.current_token.value
 
     def identifier(self):

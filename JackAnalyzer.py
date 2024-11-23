@@ -9,7 +9,7 @@ from VMWriter import VMWriter
 
 
 def parse_file(input_path):
-    output_path = input_path.with_suffix(".xml")
+    output_path = input_path.with_suffix(".vm")
     tokens = []
     with open(input_path, 'r', encoding="utf-8") as input_file:
         tokenizer = JackTokenizer(input_file)

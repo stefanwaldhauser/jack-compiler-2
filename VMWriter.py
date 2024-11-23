@@ -29,5 +29,11 @@ class VMWriter:
     def write_return(self):
         self.file.write(f"return\n")
 
+    def write_comment(self, comment):
+        self.file.write(f"// {comment}\n")
+
+    def write_empty_line(self):
+        self.file.write("\n")
+
     def close(self):
         self.file.close()

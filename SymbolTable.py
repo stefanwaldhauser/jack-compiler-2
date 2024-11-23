@@ -46,7 +46,7 @@ class SymbolTable:
         if kind in ['static', 'field']:
             return self.class_counts[kind]
         else:  # subroutine scope
-            return self.subroutine_scope[kind]
+            return self.subroutine_counts[kind]
 
     def get(self, name):
         if name in self.subroutine_scope:
@@ -66,3 +66,17 @@ class SymbolTable:
     def index_of(self, name):
         symbol = self.get(name)
         return symbol[2] if symbol else None
+
+    def virtual_segment_of(self,name):
+        symbol = self.get(name)
+        if not symbol:
+            return None
+        kind = symbol[1]
+
+        if kind == 'static':
+            return 'static'
+        if kind == 'field':
+            return 'this'
+        if kind == 'arg':
+            return 'argument'
+        return 'local'
