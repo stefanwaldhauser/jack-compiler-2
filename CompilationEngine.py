@@ -69,9 +69,6 @@ class CompilationEngine:
         subroutine_type = self.compile_keyword()
         self.symbol_table.start_subroutine()
 
-        if subroutine_type == "method":
-            self.symbol_table.define("this", self.class_name, "arg")
-
         # ('void' | type)
         if self.tokenizer.token_type() == TOKEN_TYPE.KEYWORD:
             self.compile_keyword()
@@ -87,13 +84,15 @@ class CompilationEngine:
         self.compile_symbol()
 
         # parameterList
+        if subroutine_type == "method":
+            self.symbol_table.define("this", self.class_name, "arg")
         self.compile_parameter_list()
 
         # ')'
         self.compile_symbol()
 
         # subroutineBody
-        self.compile_subroutine_body()
+        self.compile_subroutine_body(subroutine_type)
 
         self.subroutine_name = None
         self.vm_writer.write_empty_line()
@@ -145,7 +144,7 @@ class CompilationEngine:
                 self.symbol_table.define(name, type, 'arg')
 
     # Maps to grammar rule: '{' varDec* statements '}'
-    def compile_subroutine_body(self):
+    def compile_subroutine_body(self, subroutine_type):
         # '{'
         self.compile_symbol()
 
@@ -155,6 +154,15 @@ class CompilationEngine:
 
         self.vm_writer.write_function(
             f"{self.class_name}.{self.subroutine_name}", self.symbol_table.var_count('var'))
+
+        if subroutine_type == "constructor":
+            no_of_fields = self.symbol_table.var_count('field')
+            self.vm_writer.write_push("constant", no_of_fields)
+            self.vm_writer.write_call("Memory.alloc", 1)
+            self.vm_writer.write_pop("pointer", 0)
+        elif subroutine_type == "method":
+            self.vm_writer.write_push("argument", 0)
+            self.vm_writer.write_pop("pointer", 0)
 
         # statements
         self.compile_statements()
@@ -382,8 +390,7 @@ class CompilationEngine:
             if value == "null":
                 self.vm_writer.write_push("constant", 0)
             if value == "this":
-                self.vm_writer.write_push(self.symbol_table.virtual_segment_of(
-                    "this"), self.symbol_table.index_of("this"))
+                self.vm_writer.write_push("pointer", 0)
 
         elif self.tokenizer.token_type() == TOKEN_TYPE.SYMBOL and self.tokenizer.symbol() in ["~", "-"]:
             value = self.compile_symbol()
@@ -397,18 +404,27 @@ class CompilationEngine:
             self.compile_symbol()
             self.compile_expression()
             self.compile_symbol()
+
         else:  # TOKEN_TYPE.IDENTIFIER
             identifier = self.compile_identifier()
             # className or varname
             if self.tokenizer.token_type() == TOKEN_TYPE.SYMBOL and self.tokenizer.symbol() == ".":
-                classOrVarName = identifier
                 self.compile_symbol()
                 subroutine_name = self.compile_identifier()
                 self.compile_symbol()
-                nArgs = self.compile_expression_list()
+                if self.symbol_table.get(identifier):
+                    # method call
+                    self.vm_writer.write_push(self.symbol_table.virtual_segment_of(
+                        identifier), self.symbol_table.index_of(identifier))
+                    nArgs = self.compile_expression_list()
+                    class_name = self.symbol_table.type_of(identifier)
+                    self.vm_writer.write_call(
+                        f"{class_name}.{subroutine_name}", nArgs + 1)
+                else:
+                    nArgs = self.compile_expression_list()
+                    self.vm_writer.write_call(
+                        f"{identifier}.{subroutine_name}", nArgs)
                 self.compile_symbol()
-                self.vm_writer.write_call(
-                    f"{classOrVarName}.{subroutine_name}", nArgs)
 
             # Array access, like array[index]
             elif self.tokenizer.token_type() == TOKEN_TYPE.SYMBOL and self.tokenizer.symbol() == "[":
@@ -416,13 +432,14 @@ class CompilationEngine:
                 self.compile_expression()
                 self.compile_symbol()
 
-            # Function call: we handle this case by compiling the function name and arguments
+            # Calls methods of the current object
             elif self.tokenizer.token_type() == TOKEN_TYPE.SYMBOL and self.tokenizer.symbol() == "(":
                 self.compile_symbol()
                 subroutine_name = identifier
+                self.vm_writer.write_push("pointer", 0)
                 nArgs = self.compile_expression_list()
                 self.vm_writer.write_call(
-                    f"{self.class_name}.{subroutine_name}", nArgs)
+                    f"{self.class_name}.{subroutine_name}", nArgs + 1)
 
                 self.compile_symbol()
             # varName
